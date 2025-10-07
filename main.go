@@ -123,7 +123,7 @@ func handler(c *gin.Context) {
 func main() {
 	arg.Parse()
 	port := arg.KeyValueArg("port", "9123")
-	logPath := arg.KeyValueArg("logpath", "/tmp/ccproxy.log")
+	logPath := arg.KeyValueArg("logpath", "/tmp/public.log")
 	if err := log.SetLogPath(logPath); err != nil {
 		log.ErrorLog("fail to set log file path: %v", err)
 		os.Exit(1)
