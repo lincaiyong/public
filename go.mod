@@ -1,4 +1,4 @@
-module public
+module github.com/lincaiyong/public
 
 go 1.25.0
 

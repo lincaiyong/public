@@ -120,8 +120,15 @@ func handler(c *gin.Context) {
 	c.Data(http.StatusOK, contentType, b)
 }
 
+//go:embed version
+var version string
+
 func main() {
 	arg.Parse()
+	if arg.BoolArg("version") {
+		fmt.Println(version)
+		return
+	}
 	port := arg.KeyValueArg("port", "9123")
 	logPath := arg.KeyValueArg("logpath", "/tmp/public.log")
 	if err := log.SetLogPath(logPath); err != nil {
