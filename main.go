@@ -85,9 +85,9 @@ func corsMiddleware() gin.HandlerFunc {
 var resFileMap map[string][]byte
 
 func handler(c *gin.Context) {
-	filePath := c.Request.URL.Path[len("/static/"):]
+	filePath := c.Param("filepath")[1:]
 	if !strings.HasPrefix(filePath, "svg/") && !strings.HasPrefix(filePath, "vs/") {
-		b, err := os.ReadFile(path.Join("public/res/", path.Base(filePath)))
+		b, err := os.ReadFile(path.Join("res/", path.Base(filePath)))
 		if err != nil {
 			log.ErrorLog("fail to read index.js: %v", err)
 			c.String(http.StatusNotFound, "file not found")
