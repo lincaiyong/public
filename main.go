@@ -18,6 +18,65 @@ import (
 	"time"
 )
 
+var baseUrl string
+
+//go:embed version
+var version string
+
+func main() {
+	arg.Parse()
+	if arg.BoolArg("version") {
+		fmt.Println(version)
+		return
+	}
+	port := arg.KeyValueArg("port", "9123")
+	logPath := arg.KeyValueArg("logpath", "/tmp/public.log")
+	if err := log.SetLogPath(logPath); err != nil {
+		log.ErrorLog("fail to set log file path: %v", err)
+		os.Exit(1)
+	}
+	log.InfoLog("cmd line: %s", strings.Join(os.Args, " "))
+	log.InfoLog("log path: %v", logPath)
+	log.InfoLog("port: %s", port)
+	log.InfoLog("pid: %d", os.Getpid())
+	wd, _ := os.Getwd()
+	log.InfoLog("work dir: %s", wd)
+
+	baseUrl = os.Getenv("BASE_URL")
+	if baseUrl == "" {
+		log.ErrorLog("env variable BASE_URL is required")
+		os.Exit(1)
+	}
+
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-sigs
+		log.InfoLog("receive quit signal")
+		os.Exit(0)
+	}()
+
+	gin.SetMode(gin.ReleaseMode)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		start := time.Now()
+		log.InfoLog(" %s | %s", c.Request.URL.Path, c.ClientIP())
+		c.Next()
+		log.InfoLog(" %s | %s | %v | %d", c.Request.URL.Path, c.ClientIP(), time.Since(start), c.Writer.Status())
+	})
+	router.Use(corsMiddleware())
+	//router.Use(NoCacheMiddleware())
+	router.Use(cacheMiddleware(""))
+	router.GET("/static/*filepath", handler)
+
+	log.InfoLog("starting server at 127.0.0.1:%s", port)
+	err := router.Run(fmt.Sprintf("127.0.0.1:%s", port))
+	if err != nil {
+		log.ErrorLog("fail to run http server: %v", err)
+		os.Exit(1)
+	}
+}
+
 //go:embed res/res.zip
 var resZip []byte
 
@@ -93,7 +152,7 @@ func handler(c *gin.Context) {
 			c.String(http.StatusNotFound, "file not found")
 			return
 		}
-		content := strings.ReplaceAll(string(b), "<base_url>", "https://goodfun.cc")
+		content := strings.ReplaceAll(string(b), "<base_url>", baseUrl)
 		if strings.HasSuffix(filePath, ".html") {
 			c.Data(http.StatusOK, "text/html", []byte(content))
 		} else {
@@ -118,55 +177,4 @@ func handler(c *gin.Context) {
 		contentType = "image/svg+xml"
 	}
 	c.Data(http.StatusOK, contentType, b)
-}
-
-//go:embed version
-var version string
-
-func main() {
-	arg.Parse()
-	if arg.BoolArg("version") {
-		fmt.Println(version)
-		return
-	}
-	port := arg.KeyValueArg("port", "9123")
-	logPath := arg.KeyValueArg("logpath", "/tmp/public.log")
-	if err := log.SetLogPath(logPath); err != nil {
-		log.ErrorLog("fail to set log file path: %v", err)
-		os.Exit(1)
-	}
-	log.InfoLog("cmd line: %s", strings.Join(os.Args, " "))
-	log.InfoLog("log path: %v", logPath)
-	log.InfoLog("port: %s", port)
-	log.InfoLog("pid: %d", os.Getpid())
-	wd, _ := os.Getwd()
-	log.InfoLog("work dir: %s", wd)
-
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-sigs
-		log.InfoLog("receive quit signal")
-		os.Exit(0)
-	}()
-
-	gin.SetMode(gin.ReleaseMode)
-	router := gin.New()
-	router.Use(func(c *gin.Context) {
-		start := time.Now()
-		log.InfoLog(" %s | %s", c.Request.URL.Path, c.ClientIP())
-		c.Next()
-		log.InfoLog(" %s | %s | %v | %d", c.Request.URL.Path, c.ClientIP(), time.Since(start), c.Writer.Status())
-	})
-	router.Use(corsMiddleware())
-	//router.Use(NoCacheMiddleware())
-	router.Use(cacheMiddleware(""))
-	router.GET("/static/*filepath", handler)
-
-	log.InfoLog("starting server at 127.0.0.1:%s", port)
-	err := router.Run(fmt.Sprintf("127.0.0.1:%s", port))
-	if err != nil {
-		log.ErrorLog("fail to run http server: %v", err)
-		os.Exit(1)
-	}
 }
